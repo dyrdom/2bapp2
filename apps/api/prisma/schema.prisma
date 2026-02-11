@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PresenceStatus {
+  online
+  idle
+  dnd
+  invisible
+}
+
+model User {
+  id                String               @id @default(cuid())
+  email             String               @unique
+  username          String               @unique
+  passwordHash      String
+  status            PresenceStatus       @default(invisible)
+  refreshTokenHash  String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  sentMessages      Message[]            @relation("SentMessages")
+  conversationLinks ConversationMember[]
+  reactions         Reaction[]
+  readReceipts      ReadReceipt[]
+}
+
+model Conversation {
+  id           String               @id @default(cuid())
+  title        String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  members      ConversationMember[]
+  messages     Message[]
+}
+
+model ConversationMember {
+  id             String       @id @default(cuid())
+  conversationId String
+  userId         String
+  joinedAt       DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String
+  isDeleted      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  reactions      Reaction[]
+  readReceipts   ReadReceipt[]
+}
+
+model Reaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+}
+
+model ReadReceipt {
+  id             String   @id @default(cuid())
+  conversationId String
+  userId         String
+  messageId      String
+  readAt         DateTime @default(now())
+  message        Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId, messageId])
+}
